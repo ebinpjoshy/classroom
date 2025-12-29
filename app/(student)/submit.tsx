@@ -19,51 +19,40 @@ const id = params?.id as string | undefined;
     });
     if (!res.canceled) setFile(res.assets[0]);
   }
+async function handleSubmit() {
+  if (!id) return alert("Invalid assignment");
+  if (!file) return alert("Select PDF first");
 
-  async function handleSubmit() {
-    // Upload file to Cloudinary using backend
-      if (!id) return alert("Invalid assignment link");
-  if (!file) return alert("Select a PDF first");
-    const body = new FormData();
-    body.append("file", {
-      uri: file.uri,
-      name: file.name,
-      type: "application/pdf"
-    } as any);
+  const formData = new FormData();
+  formData.append("file", {
+    uri: file.uri,
+    type: "application/pdf",
+    name: file.name
+  } as any);
 
-    const res = await fetch("https://classroom-backend-1xmc.onrender.com", {
-  method: "POST",
-  headers: {
-    "Content-Type": "multipart/form-data"
-  },
-  body
-});
+  formData.append("upload_preset", "classroom_upload");
 
-    const uploaded = await res.json();
-const { data: user } = await supabase.auth.getUser();
+  const res = await fetch("https://api.cloudinary.com/v1_1/dynib391i/auto/upload", {
+    method: "POST",
+    body: formData
+  });
 
-console.log("Assignment ID:", id);
-console.log("Student ID:", user.user?.id);
-console.log("File URL:", uploaded.url);
+  const uploaded = await res.json();
 
-const { error } = await supabase.from("submissions").upsert(
-  {
+  const { data: user } = await supabase.auth.getUser();
+
+  await supabase.from("submissions").upsert({
     assignment_id: id,
     student_id: user.user?.id,
-    file_url: uploaded.url,
+    file_url: uploaded.secure_url,
     submitted_at: new Date().toISOString()
-  },
-  {
+  }, {
     onConflict: "student_id,assignment_id"
-  }
-);
+  });
 
-if (error) {
-  alert(error.message);
+  router.back();
 }
 
-    router.back();
-  }
 
   return (
     <View style={styles.container}>

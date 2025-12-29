@@ -1,7 +1,9 @@
 import * as Linking from "expo-linking";
-import { FileText } from "lucide-react-native";
+import { ExternalLink } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,15 +15,43 @@ import { supabase } from "../../lib/supabase";
 export default function Submissions() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [subs, setSubs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.from("assignments").select("*").then(r => setAssignments(r.data || []));
-    supabase.from("submission_details").select("*").then(r => setSubs(r.data || []));
+    async function fetchData() {
+      try {
+        const { data: assignmentsData } = await supabase.from("assignments").select("*");
+        const { data: subsData } = await supabase.from("submission_details").select("*");
+        
+        setAssignments(assignmentsData || []);
+        setSubs(subsData || []);
+      } catch (error) {
+        console.error("Fetch error:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
   }, []);
 
+  // FIXED: Direct linking is more reliable for Cloudinary PDFs than the Google Viewer
   async function openFile(url: string) {
-    const viewer = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`;
-    await Linking.openURL(viewer);
+    if (!url) return Alert.alert("Error", "No file URL found");
+    
+    try {
+      // Direct link works better for mobile browsers to trigger their native PDF viewer
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert("Error", "Could not open the PDF viewer.");
+    }
+  }
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', backgroundColor: "#020617" }]}>
+        <ActivityIndicator size="large" color="#38BDF8" />
+      </View>
+    );
   }
 
   return (
@@ -52,10 +82,13 @@ export default function Submissions() {
 
             {list.map(s => (
               <View key={s.id} style={styles.card}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.studentName}>{s.full_name}</Text>
                   <Text style={styles.time}>
-                    {new Date(s.submitted_at + "Z").toLocaleString()}
+                    {new Date(s.submitted_at).toLocaleString([], { 
+                      dateStyle: 'medium', 
+                      timeStyle: 'short' 
+                    })}
                   </Text>
                 </View>
 
@@ -66,7 +99,7 @@ export default function Submissions() {
                     pressed && styles.pressed
                   ]}
                 >
-                  <FileText size={20} color="#22C55E" />
+                  <ExternalLink size={20} color="#22C55E" />
                 </Pressable>
               </View>
             ))}
@@ -78,7 +111,7 @@ export default function Submissions() {
 }
 
 const styles = StyleSheet.create({
-  container: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 40 },
+  container: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 },
   header: { fontSize: 32, color: "#F8FAFC", fontWeight: "700", marginBottom: 26 },
   section: { marginBottom: 30 },
   sectionHeader: {
@@ -92,11 +125,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E293B",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 18
+    borderRadius: 18,
+    alignItems: 'center'
   },
-  badgeLabel: { color: "#94A3B8", fontSize: 10 },
+  badgeLabel: { color: "#94A3B8", fontSize: 10, textTransform: 'uppercase' },
   badgeValue: { color: "#F8FAFC", fontWeight: "600", fontSize: 14 },
-  empty: { color: "#64748B", marginTop: 10 },
+  empty: { color: "#64748B", marginTop: 10, fontStyle: 'italic' },
   card: {
     backgroundColor: "#0F172A",
     borderRadius: 16,
@@ -108,15 +142,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center"
   },
-  studentName: { color: "#F8FAFC", fontWeight: "600", fontSize: 15 },
-  time: { color: "#E5E7EB", fontSize: 14, fontWeight: "600", marginTop: 6 },
+  studentName: { color: "#F8FAFC", fontWeight: "600", fontSize: 16 },
+  time: { color: "#94A3B8", fontSize: 12, marginTop: 4 },
   fileBtn: {
-    backgroundColor: "#020617",
-    width: 42,
-    height: 42,
-    borderRadius: 10,
+    backgroundColor: "#16653420", // Light green background for the button
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: "center",
-    alignItems: "center"
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#22C55E40"
   },
-  pressed: { transform: [{ scale: 0.92 }], opacity: 0.85 }
+  pressed: { transform: [{ scale: 0.95 }], opacity: 0.7 }
 });

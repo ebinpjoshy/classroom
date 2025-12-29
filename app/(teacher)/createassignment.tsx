@@ -39,7 +39,7 @@ export default function CreateAssignment() {
 
     const res = await fetch(`${BACKEND_URL}/upload`, {
       method: "POST",
-      headers: { "Content-Type": "multipart/form-data" },
+      headers: { },
       body
     });
 

@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 
@@ -12,11 +13,17 @@ export default function GradeStudents() {
   const [groups, setGroups] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
+    // Fetch from submission_details view
     supabase
       .from("submission_details")
       .select("*")
       .order("assignment_title")
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Fetch error:", error);
+          return;
+        }
+        
         const g: Record<string, any[]> = {};
         (data || []).forEach((s) => {
           if (!g[s.assignment_title]) g[s.assignment_title] = [];
@@ -26,9 +33,27 @@ export default function GradeStudents() {
       });
   }, []);
 
-  async function saveMark(id: string, value: string) {
-    const marks = parseInt(value || "0");
-    await supabase.from("submissions").update({ marks }).eq("id", id);
+  async function saveMark(submissionId: string, value: string) {
+    const marks = parseInt(value);
+    
+    // Check if input is empty or invalid
+    if (value.trim() === "") return;
+    if (isNaN(marks)) {
+      Alert.alert("Invalid Input", "Please enter a valid number");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("submissions")
+      .update({ marks: marks }) 
+      .eq("id", submissionId); // Ensure this matches the PRIMARY KEY of the submissions table
+
+    if (error) {
+      console.error("Update error:", error);
+      Alert.alert("Error", "Could not save marks: " + error.message);
+    } else {
+      Alert.alert("Success", "Grade updated successfully!");
+    }
   }
 
   return (
@@ -48,13 +73,14 @@ export default function GradeStudents() {
               <Text style={styles.name}>{s.full_name}</Text>
 
               <TextInput
-                placeholder="Marks"
-                placeholderTextColor="#64748B"
-                keyboardType="numeric"
-                defaultValue={s.marks?.toString()}
-                style={styles.input}
-                onBlur={(e) => saveMark(s.id, e.nativeEvent.text)}
-              />
+  placeholder="Marks"
+  placeholderTextColor="#64748B"
+  keyboardType="numeric"
+  defaultValue={s.marks?.toString()}
+  style={styles.input}
+  // FIX: onEndEditing provides the 'text' property that TypeScript needs
+  onEndEditing={(e) => saveMark(s.id, e.nativeEvent.text)}
+/>
             </View>
           ))}
         </View>
